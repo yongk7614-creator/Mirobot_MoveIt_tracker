@@ -1,5 +1,7 @@
+import copy
 import math
 import threading
+from typing import Optional
 
 import rclpy
 from rclpy.node import Node
@@ -25,11 +27,11 @@ class MoveItGoalNode(Node):
         self.declare_parameter("execute", True)
         self.declare_parameter("ignore_same_goal", True)
 
-        goal_pose_topic = self.get_parameter("goal_pose_topic").value
-        group_name = self.get_parameter("group_name").value
-        base_link_name = self.get_parameter("base_link_name").value
-        end_effector_name = self.get_parameter("end_effector_name").value
-        joint_names = list(self.get_parameter("joint_names").value)
+        self.goal_pose_topic = str(self.get_parameter("goal_pose_topic").value)
+        self.group_name = str(self.get_parameter("group_name").value)
+        self.base_link_name = str(self.get_parameter("base_link_name").value)
+        self.end_effector_name = str(self.get_parameter("end_effector_name").value)
+        self.joint_names = list(self.get_parameter("joint_names").value)
 
         self.cartesian = bool(self.get_parameter("cartesian").value)
         self.cartesian_max_step = float(self.get_parameter("cartesian_max_step").value)
@@ -39,43 +41,55 @@ class MoveItGoalNode(Node):
         self.execute_motion = bool(self.get_parameter("execute").value)
         self.ignore_same_goal = bool(self.get_parameter("ignore_same_goal").value)
 
-        self._last_goal = None
+        self._last_goal = None  # type: Optional[PoseStamped]
         self._busy = False
         self._lock = threading.Lock()
 
         self.moveit2 = MoveIt2(
             node=self,
-            joint_names=joint_names,
-            base_link_name=base_link_name,
-            end_effector_name=end_effector_name,
-            group_name=group_name,
+            joint_names=self.joint_names,
+            base_link_name=self.base_link_name,
+            end_effector_name=self.end_effector_name,
+            group_name=self.group_name,
         )
 
         self.goal_sub = self.create_subscription(
             PoseStamped,
-            goal_pose_topic,
+            self.goal_pose_topic,
             self.goal_pose_callback,
             10,
         )
 
-    def goal_pose_callback(self, msg: PoseStamped) -> None:
+    def goal_pose_callback(self, msg):
         with self._lock:
             if self._busy:
+                self.get_logger().warn("MoveIt is busy. Ignoring new goal.")
                 return
+
             if self.ignore_same_goal and self._is_same_goal(msg, self._last_goal):
+                self.get_logger().info("Same goal received. Ignoring.")
                 return
+
             self._busy = True
 
+        worker = threading.Thread(
+            target=self._process_goal,
+            args=(copy.deepcopy(msg),),
+            daemon=True,
+        )
+        worker.start()
+
+    def _process_goal(self, goal_pose):
         try:
-            self.send_goal_to_moveit(msg)
-            self._last_goal = msg
-        except Exception as e:
-            self.get_logger().error(f"Failed to send goal to MoveIt: {e}")
+            self.send_goal_to_moveit(goal_pose)
+            self._last_goal = copy.deepcopy(goal_pose)
+        except Exception as exc:
+            self.get_logger().error("Failed to send goal to MoveIt: %s" % str(exc))
         finally:
             with self._lock:
                 self._busy = False
 
-    def send_goal_to_moveit(self, goal_pose: PoseStamped) -> None:
+    def send_goal_to_moveit(self, goal_pose):
         if not goal_pose.header.frame_id:
             raise ValueError("Goal pose has empty frame_id.")
 
@@ -110,7 +124,7 @@ class MoveItGoalNode(Node):
         if self.execute_motion:
             self.moveit2.wait_until_executed()
 
-    def _is_same_goal(self, a: PoseStamped, b: PoseStamped | None) -> bool:
+    def _is_same_goal(self, a, b):
         if b is None:
             return False
 
@@ -131,11 +145,11 @@ class MoveItGoalNode(Node):
         )
 
     @staticmethod
-    def _is_zero_quaternion(x: float, y: float, z: float, w: float) -> bool:
+    def _is_zero_quaternion(x, y, z, w):
         return abs(x) < 1e-12 and abs(y) < 1e-12 and abs(z) < 1e-12 and abs(w) < 1e-12
 
     @staticmethod
-    def _normalize_quaternion(x: float, y: float, z: float, w: float):
+    def _normalize_quaternion(x, y, z, w):
         norm = math.sqrt(x * x + y * y + z * z + w * w)
         if norm < 1e-12:
             raise ValueError("Quaternion norm is too small.")
@@ -147,6 +161,8 @@ def main(args=None):
     node = MoveItGoalNode()
     try:
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
     finally:
         node.destroy_node()
         rclpy.shutdown()
@@ -154,3 +170,4 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
+    

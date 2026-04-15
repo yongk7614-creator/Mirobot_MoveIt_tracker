@@ -27,16 +27,20 @@ class WheelStopToGoalNode(Node):
             "goal_qw": 1.0,
         }
 
+        # parameter declare
         for name, value in defaults.items():
             self.declare_parameter(name, value)
             setattr(self, name, self.get_parameter(name).value)
 
+        # initialize
         self.latest_pose = None
         self.prev_is_stopped = False
         self.collecting = False
         self.sample_buffer = []
         self.delay_timer = None
 
+        
+        # make subscriber
         self.pose_sub = self.create_subscription(
             PoseStamped, self.pose_topic, self.pose_callback, 10
         )

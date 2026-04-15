@@ -93,6 +93,12 @@ class MoveItGoalNode(Node):
         if not goal_pose.header.frame_id:
             raise ValueError("Goal pose has empty frame_id.")
 
+        if goal_pose.header.frame_id != self.base_link_name:
+            raise ValueError(
+                "Goal pose frame_id '%s' does not match expected base frame '%s'."
+                % (goal_pose.header.frame_id, self.base_link_name)
+            )
+
         q = goal_pose.pose.orientation
         if self._is_zero_quaternion(q.x, q.y, q.z, q.w):
             raise ValueError("Goal pose has invalid zero quaternion.")
@@ -170,4 +176,3 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
-    

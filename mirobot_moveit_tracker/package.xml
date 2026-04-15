@@ -4,7 +4,7 @@
   <name>mirobot_moveit_tracker</name>
   <version>0.0.1</version>
   <description>ROS 2 Foxy MoveIt goal node for WLKATA Mirobot.</description>
-  <maintainer email="user@example.com">user</maintainer>
+  <maintainer email="2022124194@kau.kr">user</maintainer>
   <license>MIT</license>
 
   <exec_depend>geometry_msgs</exec_depend>

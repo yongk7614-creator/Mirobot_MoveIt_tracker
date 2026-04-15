@@ -3,14 +3,15 @@
 <package format="3">
   <name>mirobot_moveit_tracker</name>
   <version>0.0.1</version>
-  <description>ROS 2 Foxy MoveIt goal node for WLKATA Mirobot.</description>
+  <description>ROS 2 Foxy package for wheel-stop to goal conversion and MoveIt goal forwarding for WLKATA Mirobot.</description>
   <maintainer email="2022124194@kau.kr">user</maintainer>
   <license>MIT</license>
 
   <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>rclpy</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
-  <exec_depend>rclpy</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

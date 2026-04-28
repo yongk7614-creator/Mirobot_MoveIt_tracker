@@ -24,7 +24,7 @@ def generate_launch_description():
             "sample_count": "5",
             "offset_x": "0.0",
             "offset_y": "0.0",
-            "offset_z": "0.0",
+            "offset_z": "0.005",
             "goal_frame": "base_link",
             "use_marker_orientation": "true",
             "goal_qx": "0.0",

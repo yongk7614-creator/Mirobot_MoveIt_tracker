@@ -78,12 +78,11 @@ class WheelStopToGoalNode(Node):
         if self.prev_is_stopped:
             return
 
-        self.prev_is_stopped = True
-
         if self.latest_pose is None:
             self.get_logger().warn("No pose received yet.")
             return
 
+        self.prev_is_stopped = True
         self.reset_sampling()
         self.delay_timer = self.create_timer(self.sample_delay_sec, self.start_sampling_once)
 

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.5)
 project(wlkata_mirobot_moveit_config)
 
 find_package(ament_cmake REQUIRED)
@@ -13,4 +13,6 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/launch")
 endif()
 
 install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
-install(FILES .setup_assistant DESTINATION share/${PROJECT_NAME})
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.setup_assistant")
+  install(FILES .setup_assistant DESTINATION share/${PROJECT_NAME})
+endif()

@@ -50,8 +50,10 @@ install(DIRECTORY rviz/
 install(DIRECTORY urdf/
   DESTINATION share/${PROJECT_NAME}/urdf
 )
-install(DIRECTORY textures/
-  DESTINATION share/${PROJECT_NAME}/textures
-)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/textures")
+  install(DIRECTORY textures/
+    DESTINATION share/${PROJECT_NAME}/textures
+  )
+endif()
 
 ament_package()

@@ -15,12 +15,16 @@ def generate_launch_description():
         DeclareLaunchArgument("offset_x", default_value="0.0"),
         DeclareLaunchArgument("offset_y", default_value="0.0"),
         DeclareLaunchArgument("offset_z", default_value="0.005"),
+        DeclareLaunchArgument("offset_frame", default_value="marker"),
         DeclareLaunchArgument("goal_frame", default_value="base_link"),
         DeclareLaunchArgument("use_marker_orientation", default_value="true"),
         DeclareLaunchArgument("goal_qx", default_value="0.0"),
         DeclareLaunchArgument("goal_qy", default_value="0.0"),
         DeclareLaunchArgument("goal_qz", default_value="0.0"),
         DeclareLaunchArgument("goal_qw", default_value="1.0"),
+        DeclareLaunchArgument(
+            "planned_trajectory_topic", default_value="/mirobot_joint_trajectory"
+        ),
         DeclareLaunchArgument("group_name", default_value="mirobot_group"),
         DeclareLaunchArgument("base_link_name", default_value="base_link"),
         DeclareLaunchArgument("end_effector_name", default_value="link6"),
@@ -44,6 +48,7 @@ def generate_launch_description():
         "offset_x": ParameterValue(LaunchConfiguration("offset_x"), value_type=float),
         "offset_y": ParameterValue(LaunchConfiguration("offset_y"), value_type=float),
         "offset_z": ParameterValue(LaunchConfiguration("offset_z"), value_type=float),
+        "offset_frame": LaunchConfiguration("offset_frame"),
         "goal_frame": LaunchConfiguration("goal_frame"),
         "use_marker_orientation": ParameterValue(
             LaunchConfiguration("use_marker_orientation"), value_type=bool
@@ -56,6 +61,7 @@ def generate_launch_description():
 
     moveit_goal_parameters = {
         "goal_pose_topic": LaunchConfiguration("goal_topic"),
+        "planned_trajectory_topic": LaunchConfiguration("planned_trajectory_topic"),
         "group_name": LaunchConfiguration("group_name"),
         "base_link_name": LaunchConfiguration("base_link_name"),
         "end_effector_name": LaunchConfiguration("end_effector_name"),

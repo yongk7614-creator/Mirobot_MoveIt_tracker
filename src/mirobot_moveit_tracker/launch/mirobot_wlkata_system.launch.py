@@ -39,7 +39,7 @@ def generate_launch_description():
             "cartesian": "false",
             "cartesian_max_step": "0.0025",
             "cartesian_fraction_threshold": "0.0",
-            "execute": "true",
+            "execute": "false",
             "ignore_same_goal": "true",
         }.items(),
     )

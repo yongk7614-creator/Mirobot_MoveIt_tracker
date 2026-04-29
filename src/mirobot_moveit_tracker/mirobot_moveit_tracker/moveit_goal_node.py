@@ -6,6 +6,7 @@ from typing import Optional
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
+from trajectory_msgs.msg import JointTrajectory
 from pymoveit2 import MoveIt2
 
 
@@ -14,6 +15,7 @@ class MoveItGoalNode(Node):
         super().__init__("moveit_goal_node")
 
         self.declare_parameter("goal_pose_topic", "/mirobot_goal_pose")
+        self.declare_parameter("planned_trajectory_topic", "/mirobot_joint_trajectory")
         self.declare_parameter("group_name", "mirobot_group")
         self.declare_parameter("base_link_name", "base_link")
         self.declare_parameter("end_effector_name", "link6")
@@ -28,6 +30,9 @@ class MoveItGoalNode(Node):
         self.declare_parameter("ignore_same_goal", True)
 
         self.goal_pose_topic = str(self.get_parameter("goal_pose_topic").value)
+        self.planned_trajectory_topic = str(
+            self.get_parameter("planned_trajectory_topic").value
+        )
         self.group_name = str(self.get_parameter("group_name").value)
         self.base_link_name = str(self.get_parameter("base_link_name").value)
         self.end_effector_name = str(self.get_parameter("end_effector_name").value)
@@ -57,6 +62,11 @@ class MoveItGoalNode(Node):
             PoseStamped,
             self.goal_pose_topic,
             self.goal_pose_callback,
+            10,
+        )
+        self.trajectory_pub = self.create_publisher(
+            JointTrajectory,
+            self.planned_trajectory_topic,
             10,
         )
 
@@ -112,23 +122,71 @@ class MoveItGoalNode(Node):
         ]
         quat_xyzw = [qx, qy, qz, qw]
 
-        if self.cartesian:
-            self.moveit2.move_to_pose(
-                position=position,
-                quat_xyzw=quat_xyzw,
-                cartesian=True,
-                cartesian_max_step=self.cartesian_max_step,
-                cartesian_fraction_threshold=self.cartesian_fraction_threshold,
-            )
-        else:
-            self.moveit2.move_to_pose(
-                position=position,
-                quat_xyzw=quat_xyzw,
-                cartesian=False,
-            )
+        plan_result = self._plan_pose(position, quat_xyzw)
+        joint_trajectory = self._extract_joint_trajectory(plan_result)
+        if joint_trajectory is None or not joint_trajectory.points:
+            raise RuntimeError("MoveIt returned an empty trajectory.")
+
+        self.trajectory_pub.publish(joint_trajectory)
+        self.get_logger().info(
+            "Published planned joint trajectory with %d points to %s."
+            % (len(joint_trajectory.points), self.planned_trajectory_topic)
+        )
 
         if self.execute_motion:
-            self.moveit2.wait_until_executed()
+            self._execute_plan(plan_result)
+
+    def _plan_pose(self, position, quat_xyzw):
+        if not hasattr(self.moveit2, "plan"):
+            raise RuntimeError(
+                "Installed pymoveit2 does not expose MoveIt2.plan(). "
+                "Install a pymoveit2 version that supports planning result access, "
+                "or change this node to use the MoveGroup action directly."
+            )
+
+        kwargs = {
+            "position": position,
+            "quat_xyzw": quat_xyzw,
+            "cartesian": self.cartesian,
+        }
+        if self.cartesian:
+            kwargs["cartesian_max_step"] = self.cartesian_max_step
+            kwargs["cartesian_fraction_threshold"] = self.cartesian_fraction_threshold
+
+        return self.moveit2.plan(**kwargs)
+
+    def _execute_plan(self, plan_result):
+        if hasattr(self.moveit2, "execute"):
+            self.moveit2.execute(plan_result)
+        elif hasattr(self.moveit2, "execute_trajectory"):
+            self.moveit2.execute_trajectory(plan_result)
+        else:
+            raise RuntimeError(
+                "Installed pymoveit2 does not expose execute() or execute_trajectory()."
+            )
+
+        self.moveit2.wait_until_executed()
+
+    @staticmethod
+    def _extract_joint_trajectory(plan_result):
+        if isinstance(plan_result, JointTrajectory):
+            return plan_result
+
+        if hasattr(plan_result, "joint_trajectory"):
+            return plan_result.joint_trajectory
+
+        if hasattr(plan_result, "trajectory") and hasattr(
+            plan_result.trajectory, "joint_trajectory"
+        ):
+            return plan_result.trajectory.joint_trajectory
+
+        if isinstance(plan_result, tuple):
+            for item in plan_result:
+                trajectory = MoveItGoalNode._extract_joint_trajectory(item)
+                if trajectory is not None:
+                    return trajectory
+
+        return None
 
     def _is_same_goal(self, a, b):
         if b is None:

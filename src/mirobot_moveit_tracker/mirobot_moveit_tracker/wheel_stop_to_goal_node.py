@@ -1,4 +1,5 @@
 import copy
+import math
 
 import rclpy
 from rclpy.node import Node
@@ -19,6 +20,7 @@ class WheelStopToGoalNode(Node):
             "offset_x": 0.0,
             "offset_y": 0.0,
             "offset_z": 0.0,
+            "offset_frame": "marker",
             "goal_frame": "base_link",
             "use_marker_orientation": True,
             "goal_qx": 0.0,
@@ -35,6 +37,7 @@ class WheelStopToGoalNode(Node):
         # initialize
         self.latest_pose = None
         self.prev_is_stopped = False
+        self.waiting_for_first_pose_after_stop = False
         self.collecting = False
         self.sample_buffer = []
         self.delay_timer = None
@@ -51,6 +54,7 @@ class WheelStopToGoalNode(Node):
 
     def reset_sampling(self):
         self.collecting = False
+        self.waiting_for_first_pose_after_stop = False
         self.sample_buffer = []
         if self.delay_timer is not None:
             self.delay_timer.cancel()
@@ -58,6 +62,12 @@ class WheelStopToGoalNode(Node):
 
     def pose_callback(self, msg):
         self.latest_pose = msg
+
+        if self.waiting_for_first_pose_after_stop:
+            self.waiting_for_first_pose_after_stop = False
+            self.schedule_sampling()
+            return
+
         if not self.collecting:
             return
 
@@ -79,10 +89,18 @@ class WheelStopToGoalNode(Node):
             return
 
         if self.latest_pose is None:
-            self.get_logger().warn("No pose received yet.")
+            self.prev_is_stopped = True
+            self.waiting_for_first_pose_after_stop = True
+            self.get_logger().warn(
+                "Wheel stopped before any pose was received. "
+                "Sampling will start when the first pose arrives."
+            )
             return
 
         self.prev_is_stopped = True
+        self.schedule_sampling()
+
+    def schedule_sampling(self):
         self.reset_sampling()
         self.delay_timer = self.create_timer(self.sample_delay_sec, self.start_sampling_once)
 
@@ -108,9 +126,11 @@ class WheelStopToGoalNode(Node):
         goal_pose = copy.deepcopy(self.sample_buffer[-1])
         goal_pose.header.stamp = self.get_clock().now().to_msg()
         goal_pose.header.frame_id = self.goal_frame
-        goal_pose.pose.position.x = avg_x + self.offset_x
-        goal_pose.pose.position.y = avg_y + self.offset_y
-        goal_pose.pose.position.z = avg_z + self.offset_z
+
+        offset_x, offset_y, offset_z = self._resolve_offset_in_goal_frame(goal_pose)
+        goal_pose.pose.position.x = avg_x + offset_x
+        goal_pose.pose.position.y = avg_y + offset_y
+        goal_pose.pose.position.z = avg_z + offset_z
 
         if not self.use_marker_orientation:
             goal_pose.pose.orientation.x = self.goal_qx
@@ -127,6 +147,38 @@ class WheelStopToGoalNode(Node):
                 goal_pose.pose.position.z,
             )
         )
+
+    def _resolve_offset_in_goal_frame(self, marker_pose):
+        offset = (float(self.offset_x), float(self.offset_y), float(self.offset_z))
+
+        if str(self.offset_frame).lower() in ("base", "goal", "base_link"):
+            return offset
+
+        q = marker_pose.pose.orientation
+        qx, qy, qz, qw = self._normalize_quaternion(q.x, q.y, q.z, q.w)
+        return self._rotate_vector_by_quaternion(offset, (qx, qy, qz, qw))
+
+    @staticmethod
+    def _normalize_quaternion(x, y, z, w):
+        norm = math.sqrt(x * x + y * y + z * z + w * w)
+        if norm < 1e-12:
+            raise ValueError("Marker pose has invalid zero quaternion.")
+        return x / norm, y / norm, z / norm, w / norm
+
+    @staticmethod
+    def _rotate_vector_by_quaternion(vector, quaternion):
+        vx, vy, vz = vector
+        qx, qy, qz, qw = quaternion
+
+        # Efficient form of q * v * q^-1 for a unit quaternion.
+        tx = 2.0 * (qy * vz - qz * vy)
+        ty = 2.0 * (qz * vx - qx * vz)
+        tz = 2.0 * (qx * vy - qy * vx)
+
+        rx = vx + qw * tx + (qy * tz - qz * ty)
+        ry = vy + qw * ty + (qz * tx - qx * tz)
+        rz = vz + qw * tz + (qx * ty - qy * tx)
+        return rx, ry, rz
 
 
 def main(args=None):

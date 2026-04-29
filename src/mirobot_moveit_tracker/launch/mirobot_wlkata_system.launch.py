@@ -25,12 +25,14 @@ def generate_launch_description():
             "offset_x": "0.0",
             "offset_y": "0.0",
             "offset_z": "0.005",
+            "offset_frame": "marker",
             "goal_frame": "base_link",
             "use_marker_orientation": "true",
             "goal_qx": "0.0",
             "goal_qy": "0.0",
             "goal_qz": "0.0",
             "goal_qw": "1.0",
+            "planned_trajectory_topic": "/mirobot_joint_trajectory",
             "group_name": "mirobot_group",
             "base_link_name": "base_link",
             "end_effector_name": "link6",
@@ -57,6 +59,17 @@ def generate_launch_description():
         executable="mirobot_moveit_move",
         name="mirobot_moveit_move",
         output="screen",
+        parameters=[
+            {
+                "trajectory_topic": "/mirobot_joint_trajectory",
+                "serial_port": "/dev/ttyUSB0",
+                "baud_rate": 115200,
+                "serial_timeout": 1.0,
+                "do_homing": True,
+                "gcode_motion": "G01",
+                "min_point_delay_sec": 0.02,
+            }
+        ],
     )
 
     return LaunchDescription(

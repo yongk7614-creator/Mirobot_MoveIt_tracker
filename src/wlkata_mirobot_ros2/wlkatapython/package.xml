@@ -1,0 +1,12 @@
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+<name>wlkatapython</name>
+<version>0.1.1</version>
+<description>Python serial SDK for WLKATA robot arms.</description>
+<maintainer email="wlkata@todo.todo">wlkata</maintainer>
+<license>MIT</license>
+<exec_depend>python3-serial</exec_depend>
+<export>
+<build_type>ament_python</build_type>
+</export>
+</package>
